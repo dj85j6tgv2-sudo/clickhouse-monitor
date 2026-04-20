@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 from src.query_executor import execute_query
-from src.ui.components import render_alert_banner, render_domain_page
+from src.ui.components import init_page, render_domain_page
 
 st.set_page_config(page_title="Disk — ClickHouse Monitor", layout="wide")
 
-alert_log = st.session_state.get("alert_log")
-if alert_log:
-    render_alert_banner(alert_log)
+init_page()
+
 
 
 def _run(domain, name):

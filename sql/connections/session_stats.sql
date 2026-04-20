@@ -5,14 +5,14 @@ SELECT
     hostName()  AS hostname,
     m.metric    AS protocol,
     m.value     AS active_connections,
-    toUInt64(s.value)   AS configured_max,
-    round(m.value * 100.0 / greatest(toUInt64(s.value), 1), 1) AS utilization_pct,
+    toUInt64OrZero(s.value)   AS configured_max,
+    round(m.value * 100.0 / greatest(toUInt64OrZero(s.value), 1), 1) AS utilization_pct,
     CASE
-        WHEN m.value * 100.0 / greatest(toUInt64(s.value), 1) >= 90
+        WHEN m.value * 100.0 / greatest(toUInt64OrZero(s.value), 1) >= 90
                             THEN 'CRITICAL - Connection pool near exhaustion (>=90%)'
-        WHEN m.value * 100.0 / greatest(toUInt64(s.value), 1) >= 70
+        WHEN m.value * 100.0 / greatest(toUInt64OrZero(s.value), 1) >= 70
                             THEN 'WARNING  - High connection usage (>=70%)'
-        WHEN m.value * 100.0 / greatest(toUInt64(s.value), 1) >= 50
+        WHEN m.value * 100.0 / greatest(toUInt64OrZero(s.value), 1) >= 50
                             THEN 'CAUTION  - Moderate connection usage (>=50%)'
         ELSE                     'OK       - Connection usage is normal'
     END AS connection_status

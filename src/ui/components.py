@@ -1,6 +1,9 @@
 from math import ceil
+import time
+import threading
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 from src.alerts.evaluator import AlertLog, extract_severity
 from src.ui.formatters import style_dataframe
 
@@ -120,6 +123,113 @@ def render_status_summary(df: pd.DataFrame, status_column: str) -> None:
     cols = st.columns(4)
     for col, (sev, count) in zip(cols, counts.items()):
         col.markdown(f"{_SEVERITY_EMOJI.get(sev, '')} **{sev}:** {count}")
+
+
+def init_page() -> dict:
+    """
+    Call at the top of every page (after st.set_page_config).
+    Handles: config load, ClickHouse connection, alert thread, sidebar, alert banner,
+    auto-refresh.  Returns the sidebar settings dict.
+    """
+    from src.config import load_config, ConfigError
+    from src.connection import create_client, check_connection
+    from src.query_executor import execute_query
+
+    # ── Config ────────────────────────────────────────────────────────────
+    if "config" not in st.session_state:
+        try:
+            st.session_state.config = load_config(Path("config.yaml"))
+        except ConfigError as e:
+            st.error(f"Configuration error: {e}")
+            st.stop()
+    config = st.session_state.config
+
+    # ── Alert log ─────────────────────────────────────────────────────────
+    if "alert_log" not in st.session_state:
+        st.session_state.alert_log = AlertLog(max_size=100)
+
+    # ── ClickHouse client ─────────────────────────────────────────────────
+    if "ch_client" not in st.session_state:
+        try:
+            client = create_client(config)
+            if not check_connection(client):
+                st.error("Failed to connect to ClickHouse. Check config.yaml.")
+                st.stop()
+            st.session_state.ch_client = client
+        except Exception as e:
+            st.error(f"Connection error: {e}")
+            st.stop()
+
+    # ── Background alert thread (start once per process) ──────────────────
+    if config["alerts"]["enabled"] and "alert_thread_started" not in st.session_state:
+        st.session_state.alert_thread_started = True
+
+        def _alert_loop(cfg: dict, alert_log: AlertLog) -> None:
+            from src.alerts.email_sender import send_alert_email
+            from src.alerts.evaluator import evaluate_dataframe
+            sql_dir = Path("sql")
+            interval = cfg["alerts"]["check_interval_seconds"]
+            cooldown = cfg["alerts"]["cooldown_minutes"]
+            cluster = cfg["clickhouse"]["cluster"]
+            severity_levels = set(cfg["alerts"]["severity_levels"])
+            _ALERT_QUERIES = [
+                ("disk",         "free_space",         "used_pct",       None),
+                ("cluster",      "replica_consistency","replica_status",  "hostname"),
+                ("cluster",      "zookeeper_health",   "zk_status",       "hostname"),
+                ("disk",         "broken_parts",       None,              None),
+                ("merges",       "mutations",           None,              None),
+                ("dictionaries", "status",              "dict_status",     "hostname"),
+            ]
+            try:
+                client = create_client(cfg)
+            except Exception:
+                return
+            while True:
+                try:
+                    pending = []
+                    for domain, qname, scol, kcol in _ALERT_QUERIES:
+                        df = execute_query(client, sql_dir, domain, qname,
+                                           cluster=cluster,
+                                           lookback_hours=cfg["lookback"]["default_hours"],
+                                           lookback_days=cfg["lookback"]["default_days"])
+                        if scol and kcol and scol in df.columns:
+                            for alert in evaluate_dataframe(df, domain, scol, kcol):
+                                if alert.severity in severity_levels:
+                                    if alert_log.should_send(alert, cooldown):
+                                        pending.append(alert)
+                                    alert_log.add(alert)
+                    if pending and cfg["alerts"].get("smtp"):
+                        try:
+                            send_alert_email(pending, cluster_name=cluster,
+                                             smtp_config=cfg["alerts"]["smtp"])
+                            for a in pending:
+                                alert_log.record_sent(a)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                time.sleep(interval)
+
+        t = threading.Thread(target=_alert_loop,
+                             args=(config, st.session_state.alert_log),
+                             daemon=True)
+        t.start()
+
+    # ── Sidebar ───────────────────────────────────────────────────────────
+    settings = render_sidebar(config)
+    st.session_state.lookback_hours = settings["lookback_hours"]
+    st.session_state.lookback_days = settings["lookback_days"]
+
+    # ── Alert banner ──────────────────────────────────────────────────────
+    render_alert_banner(st.session_state.alert_log)
+
+    # ── Auto-refresh ──────────────────────────────────────────────────────
+    if settings["auto_refresh"]:
+        time.sleep(settings["refresh_interval"])
+        st.cache_data.clear()
+        st.rerun()
+
+    return settings
 
 
 def render_domain_page(title: str, queries: list) -> None:

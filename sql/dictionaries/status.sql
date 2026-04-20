@@ -15,10 +15,9 @@ SELECT
     loading_start_time,
     last_exception,
     CASE
-        WHEN status = 'FAILED'              THEN 'CRITICAL - Dictionary failed to load'
-        WHEN status = 'FAILED_AND_EXPIRED'  THEN 'CRITICAL - Dictionary failed and data has expired'
-        WHEN status = 'EXPIRED'             THEN 'WARNING  - Dictionary data has expired (not yet reloaded)'
-        WHEN last_exception != ''           THEN 'WARNING  - Previous load had exceptions'
+        WHEN status = 'FAILED'               THEN 'CRITICAL - Dictionary failed to load'
+        WHEN status = 'FAILED_AND_RELOADING' THEN 'WARNING  - Dictionary failed, retrying reload'
+        WHEN last_exception != ''            THEN 'WARNING  - Previous load had exceptions'
         WHEN minutes_since_last_update > 60 THEN 'CAUTION  - Not updated in >1 hour'
         ELSE                                     'OK       - Dictionary is current'
     END AS dict_status

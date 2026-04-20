@@ -1,18 +1,17 @@
 -- broken_parts.sql
--- Recent BrokenPart events recorded in the part log across all nodes.
--- A broken part indicates data corruption; ClickHouse moves it to detached/.
+-- Parts currently sitting in the detached/ directory across all nodes.
+-- A detached part indicates ClickHouse moved it aside due to corruption or manual intervention.
+-- Note: system.part_log's BrokenPart event type is not available in 24.8; use system.detached_parts.
 SELECT
-    hostName()                  AS hostname,
-    event_time,
+    hostName()                              AS hostname,
     database,
     table,
-    part_name,
+    name                                    AS part_name,
     partition_id,
-    rows,
-    formatReadableSize(size_in_bytes)   AS size,
-    error,
-    exception
-    -- ALERT: Any row in this result = data integrity event requiring investigation
+    formatReadableSize(bytes_on_disk)       AS size,
+    reason,
+    modification_time
+    -- ALERT: reason LIKE '%broken%' → data corruption, requires investigation
     -- ACTION (step 1): Check if table is replicated:
     --         SELECT * FROM system.replicas WHERE database = '<db>' AND table = '<table>'
     -- ACTION (step 2): If replicated, fetch healthy copy from another replica:
@@ -21,10 +20,8 @@ SELECT
     --         ALTER TABLE <db>.<table> DROP DETACHED PART '<part_name>'
     -- ACTION (step 4): Run CHECK TABLE to assess remaining data health:
     --         CHECK TABLE <db>.<table>
-    -- DOCS: system.part_log — https://clickhouse.com/docs/en/operations/system-tables/part_log
-FROM clusterAllReplicas({cluster:String}, system.part_log)
-WHERE event_type = 'BrokenPart'
-  AND event_time >= now() - toIntervalDay({lookback_days:UInt32})
-  AND database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
-ORDER BY event_time DESC
+    -- DOCS: system.detached_parts — https://clickhouse.com/docs/en/operations/system-tables/detached_parts
+FROM clusterAllReplicas({cluster:String}, system.detached_parts)
+WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+ORDER BY modification_time DESC
 LIMIT 50;

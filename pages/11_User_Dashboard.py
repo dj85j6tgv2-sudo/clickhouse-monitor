@@ -2,13 +2,11 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 from src.query_executor import execute_query
-from src.ui.components import render_alert_banner
+from src.ui.components import init_page
 
 st.set_page_config(page_title="User Dashboard — ClickHouse Monitor", layout="wide")
 
-alert_log = st.session_state.get("alert_log")
-if alert_log:
-    render_alert_banner(alert_log)
+init_page()
 
 
 def _run(domain, name):
@@ -27,17 +25,30 @@ def _run(domain, name):
 st.markdown("## User Dashboard")
 
 df_activity_all = _run("users", "activity")
-if df_activity_all.empty or ("error" in df_activity_all.columns and len(df_activity_all.columns) == 1):
-    st.warning("Could not load user data. Check ClickHouse connection.")
-    st.stop()
+_data_ok = not df_activity_all.empty and not (
+    "error" in df_activity_all.columns and len(df_activity_all.columns) == 1
+)
+if not _data_ok:
+    if "error" in df_activity_all.columns:
+        st.error(f"Query error: {df_activity_all['error'].iloc[0]}")
+    else:
+        st.info("No user activity found in this time window.")
 
-all_users = sorted(df_activity_all["user"].unique().tolist())
-selected_user = st.selectbox("Select user", options=all_users)
+all_users: list = sorted(df_activity_all["user"].unique().tolist()) if _data_ok else []
+selected_user = st.selectbox(
+    "Select user",
+    options=all_users if all_users else ["(no users)"],
+    disabled=not all_users,
+)
 
 tab_activity, tab_errors, tab_tables = st.tabs(["Activity", "Errors", "Table Usage"])
 
 with tab_activity:
-    user_row = df_activity_all[df_activity_all["user"] == selected_user]
+    if not _data_ok:
+        st.info("No activity data to display.")
+        user_row = df_activity_all.iloc[0:0]  # empty frame, correct schema avoided
+    else:
+        user_row = df_activity_all[df_activity_all["user"] == selected_user]
     if user_row.empty:
         st.info(f"No activity for {selected_user} in this window")
     else:

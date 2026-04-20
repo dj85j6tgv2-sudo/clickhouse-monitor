@@ -6,10 +6,10 @@ SELECT
     user,
     event_time,
     query_duration_ms,
-    formatReadableQuantity(read_rows)       AS read_rows,
-    formatReadableQuantity(result_rows)     AS result_rows,
-    round(read_rows / greatest(result_rows, 1), 0)  AS read_to_result_ratio,
-    formatReadableSize(read_bytes)          AS read_bytes,
+    formatReadableQuantity(read_rows)                       AS read_rows_fmt,
+    formatReadableQuantity(result_rows)                     AS result_rows_fmt,
+    toUInt64(read_rows / greatest(result_rows, toUInt64(1))) AS read_to_result_ratio,
+    formatReadableSize(read_bytes)                          AS read_bytes,
     formatReadableSize(memory_usage)        AS memory_usage,
     arrayStringConcat(tables, ', ')         AS tables_accessed,
     substring(query, 1, 200)               AS query_preview
@@ -22,7 +22,7 @@ SELECT
     -- DOCS: https://clickhouse.com/docs/en/optimize/sparse-primary-indexes
 FROM clusterAllReplicas({cluster:String}, system.query_log)
 WHERE event_time >= now() - toIntervalHour({lookback_hours:UInt32})
-  AND type = 'QueryFinish'
+  AND toString(type) = 'QueryFinish'
   AND read_rows > 1000000
   AND result_rows < read_rows / 1000
   AND user NOT IN ('_clickhouse_system', 'monitoring-internal')

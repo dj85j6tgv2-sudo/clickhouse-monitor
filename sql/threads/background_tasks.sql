@@ -9,7 +9,7 @@ SELECT
     database,
     table,
     result_part_name                            AS target,
-    round(elapsed, 1)                           AS elapsed_seconds,
+    toFloat64(round(elapsed, 1))                AS elapsed_seconds,
     round(progress * 100, 1)                    AS progress_pct,
     formatReadableSize(total_size_bytes_compressed) AS size,
     ''                                          AS fail_reason
@@ -29,8 +29,8 @@ SELECT
     database,
     table,
     mutation_id                                 AS target,
-    dateDiff('second', create_time, now())      AS elapsed_seconds,
-    round((1 - parts_to_do / greatest(parts_to_do_count, 1)) * 100, 1) AS progress_pct,
+    toFloat64(dateDiff('second', create_time, now())) AS elapsed_seconds,
+    0.0                                               AS progress_pct,  -- parts_to_do_count removed in 24.8
     ''                                          AS size,
     latest_fail_reason                          AS fail_reason
     -- ALERT: fail_reason != '' → mutation is stuck with an error
@@ -49,7 +49,7 @@ SELECT
     database,
     table,
     toString(countIf(type = 'GET_PART'))        AS target,
-    max(toUnixTimestamp(now()) - toUnixTimestamp(create_time)) AS elapsed_seconds,
+    toFloat64(max(toUnixTimestamp(now()) - toUnixTimestamp(create_time))) AS elapsed_seconds,
     0.0                                         AS progress_pct,
     ''                                          AS size,
     anyIf(last_exception, last_exception != '') AS fail_reason
