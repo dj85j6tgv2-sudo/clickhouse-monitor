@@ -1,0 +1,21 @@
+# Runtime config (contains real credentials — never commit)
+config.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+
+# Streamlit
+.streamlit/
+
+# Env
+.env
