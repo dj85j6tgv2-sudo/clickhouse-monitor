@@ -1,0 +1,42 @@
+clickhouse:
+  host: "loadbalancer.example.com"
+  port: 8123
+  user: "monitoring"
+  password: "changeme"
+  cluster: "ecredal_cluster"
+  connect_timeout: 10
+  query_timeout: 30
+
+lookback:
+  default_hours: 6
+  default_days: 7
+
+refresh:
+  auto_enabled: false
+  interval_seconds: 60
+
+alerts:
+  enabled: true
+  check_interval_seconds: 300
+  cooldown_minutes: 30
+  severity_levels:
+    - CRITICAL
+    - WARNING
+
+  smtp:
+    host: "smtp.example.com"
+    port: 587
+    use_tls: true
+    user: "alerts@example.com"
+    password: "changeme"
+    from_address: "clickhouse-monitor@example.com"
+    recipients:
+      - "dba-team@example.com"
+
+thresholds:
+  disk_used_pct_warning: 75
+  disk_used_pct_critical: 90
+  memory_usage_warning_gb: 10
+  memory_usage_critical_gb: 20
+  replication_delay_warning: 60
+  replication_delay_critical: 300
