@@ -173,6 +173,15 @@ class TestDiskPage:
         go_to(page, "Disk")
         expect(page.get_by_text("TTL Progress", exact=False)).to_be_visible()
 
+    def test_disk_history_section(self, page: Page):
+        go_to(page, "Disk")
+        expect(page.get_by_text("Disk Usage History", exact=False)).to_be_visible()
+
+    def test_disk_history_metric_cards(self, page: Page):
+        go_to(page, "Disk")
+        expect(page.get_by_text("Disk Used", exact=False).first).to_be_visible()
+        expect(page.get_by_text("Available Space", exact=False)).to_be_visible()
+
 
 class TestMergesPage:
     def test_merges_page_loads(self, page: Page):

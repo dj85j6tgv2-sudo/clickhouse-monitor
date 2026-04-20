@@ -232,8 +232,9 @@ def init_page() -> dict:
     return settings
 
 
-def render_domain_page(title: str, queries: list) -> None:
-    st.markdown(f"## {title}")
+def render_domain_page(title: str, queries: list, skip_title: bool = False) -> None:
+    if not skip_title:
+        st.markdown(f"## {title}")
     for section_title, df, status_col in queries:
         st.markdown(f"### {section_title}")
         if df is None or df.empty:
