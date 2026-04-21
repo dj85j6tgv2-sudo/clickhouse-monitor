@@ -21,16 +21,25 @@ def render_sidebar(config: dict) -> dict:
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Time Window**")
 
+    # Initialise defaults in session_state so they survive page navigation
+    if "time_window_preset" not in st.session_state:
+        st.session_state["time_window_preset"] = "6h"
+    if "custom_lookback_hours" not in st.session_state:
+        st.session_state["custom_lookback_hours"] = 6
+
     preset = st.sidebar.radio(
         "Lookback",
         options=["1h", "6h", "24h", "7d", "Custom"],
-        index=1,
+        key="time_window_preset",
         horizontal=True,
         label_visibility="collapsed",
     )
     hours_map = {"1h": 1, "6h": 6, "24h": 24, "7d": 168}
     if preset == "Custom":
-        lookback_hours = st.sidebar.number_input("Hours", min_value=1, max_value=720, value=6)
+        lookback_hours = st.sidebar.number_input(
+            "Hours", min_value=1, max_value=720,
+            key="custom_lookback_hours",
+        )
     else:
         lookback_hours = hours_map[preset]
 
@@ -38,13 +47,18 @@ def render_sidebar(config: dict) -> dict:
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Refresh**")
-    auto_refresh = st.sidebar.toggle("Auto-refresh", value=config["refresh"]["auto_enabled"])
+    auto_refresh = st.sidebar.toggle(
+        "Auto-refresh",
+        value=config["refresh"]["auto_enabled"],
+        key="auto_refresh",
+    )
     refresh_interval = config["refresh"]["interval_seconds"]
     if auto_refresh:
         refresh_interval = st.sidebar.select_slider(
             "Interval (s)",
             options=[30, 60, 300],
             value=config["refresh"]["interval_seconds"],
+            key="refresh_interval",
         )
 
     if st.sidebar.button("Refresh Now", use_container_width=True):
